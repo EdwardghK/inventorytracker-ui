@@ -1,0 +1,108 @@
+<section class="page">
+  <header class="page__head">
+    <div>
+      <p class="eyebrow">Update inventory</p>
+      <h1>Edit items inline or add new SKUs.</h1>
+      <p class="lede">All fields are editable; save per row. Category/subcategory align automatically.</p>
+    </div>
+    <button class="ghost" type="button" (click)="load()" [disabled]="loading()">Refresh</button>
+  </header>
+
+  <section class="card">
+    <h2>Add new item</h2>
+    <div class="actions-row">
+      <button class="ghost" type="button" (click)="toggleScanner()">
+        {{ showScanner() ? 'Close scanner' : 'Scan SKU' }}
+      </button>
+    </div>
+    <app-sku-scanner *ngIf="showScanner()" (scanned)="onScan($event)" (closed)="showScanner.set(false)"></app-sku-scanner>
+
+    <div class="grid">
+      <label>
+        <span>Name</span>
+        <input [(ngModel)]="newItem().name" />
+      </label>
+      <label>
+        <span>SKU</span>
+        <input [(ngModel)]="newItem().sku" />
+      </label>
+      <label>
+        <span>Shelf</span>
+        <input [(ngModel)]="newItem().shelf" />
+      </label>
+      <label>
+        <span>On hand</span>
+        <input type="number" [(ngModel)]="newItem().onHand" />
+      </label>
+      <label>
+        <span>Reorder point</span>
+        <input type="number" [(ngModel)]="newItem().reorderPoint" />
+      </label>
+      <label>
+        <span>Category</span>
+        <select [(ngModel)]="newItem().category">
+          <option [ngValue]="undefined">--</option>
+          <option *ngFor="let cat of categories" [ngValue]="cat">{{ cat }}</option>
+        </select>
+      </label>
+      <label>
+        <span>Subcategory</span>
+        <select [(ngModel)]="newItem().subcategory">
+          <option [ngValue]="undefined">--</option>
+          <option *ngFor="let sub of subcategoryOptions(newItem().category)" [ngValue]="sub">{{ sub }}</option>
+        </select>
+      </label>
+    </div>
+    <button class="primary" type="button" (click)="addItem()" [disabled]="loading()">Add item</button>
+  </section>
+
+  <section class="card table-card">
+    <div class="table-head">
+      <div>
+        <h2>All items (edit mode)</h2>
+        <p class="hint">Save per row; delete removes the record.</p>
+      </div>
+      <div class="badges">
+        <span class="badge" *ngIf="loading()">Loading…</span>
+        <span class="badge warn" *ngIf="error()">{{ error() }}</span>
+      </div>
+    </div>
+
+    <div class="table">
+      <div class="table__row table__head">
+        <div>Name</div>
+        <div>SKU</div>
+        <div>Shelf</div>
+        <div>On hand</div>
+        <div>Reorder</div>
+        <div>Category</div>
+        <div>Subcategory</div>
+        <div>Actions</div>
+      </div>
+
+      <div class="table__row" *ngFor="let item of filteredEdits(); trackBy: trackById">
+        <div><input [(ngModel)]="item.name" /></div>
+        <div><input [(ngModel)]="item.sku" /></div>
+        <div><input [(ngModel)]="item.shelf" /></div>
+        <div><input type="number" [(ngModel)]="item.onHand" /></div>
+        <div><input type="number" [(ngModel)]="item.reorderPoint" /></div>
+        <div>
+          <select [(ngModel)]="item.category">
+            <option [ngValue]="undefined">--</option>
+            <option *ngFor="let cat of categories" [ngValue]="cat">{{ cat }}</option>
+          </select>
+        </div>
+        <div>
+          <select [(ngModel)]="item.subcategory">
+            <option [ngValue]="undefined">--</option>
+            <option *ngFor="let sub of subcategoryOptions(item.category)" [ngValue]="sub">{{ sub }}</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="ghost" type="button" (click)="saveItem(item)" [disabled]="loading()">Save</button>
+          <button class="danger" type="button" (click)="deleteItem(item.id)" [disabled]="loading()">Delete</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</section>

@@ -1,0 +1,142 @@
+<section class="hero">
+  <div>
+    <p class="eyebrow">Inventory hub</p>
+    <h1>Track stock, suppliers, and alerts in one view.</h1>
+    <p class="lede">
+      Supabase-backed Angular dashboard for shelves, 3PLs, and store rooms. Swap the mock data with your
+      Supabase tables to go live.
+    </p>
+    <div class="actions">
+      <button type="button" class="primary" (click)="load()" [disabled]="loading()">Refresh data</button>
+      <a class="ghost" href="https://supabase.com" target="_blank" rel="noreferrer">View Supabase docs</a>
+      <button type="button" class="ghost" (click)="toggleScanner()">
+        {{ showScanner() ? 'Close scanner' : 'Find items by barcode' }}
+      </button>
+    </div>
+  </div>
+  <div class="panel">
+    <p class="label">Status</p>
+    <div class="status-row">
+      <span class="dot" [class.ok]="!error()" [class.warn]="error()"></span>
+      <span>{{ error() ? 'Offline (mock data)' : 'Live Supabase connection' }}</span>
+    </div>
+    <p class="hint">Configure `environment.ts` with your Supabase URL and anon key.</p>
+  </div>
+</section>
+
+<section class="scanner-row" *ngIf="showScanner()">
+  <app-sku-scanner (scanned)="onScan($event)" (closed)="showScanner.set(false)"></app-sku-scanner>
+</section>
+
+<section class="stats">
+  <article class="stat-card">
+    <p class="label">SKUs</p>
+    <h2>{{ items().length }}</h2>
+    <p>Active stock-keeping units tracked.</p>
+  </article>
+  <article class="stat-card">
+    <p class="label">Units on hand</p>
+    <h2>{{ totalOnHand() | number }}</h2>
+    <p>Aggregated across all shelves.</p>
+  </article>
+  <article class="stat-card" [class.alert]="lowStock().length > 0">
+    <p class="label">Low stock</p>
+    <h2>{{ lowStock().length }}</h2>
+    <p>Items at or below reorder point.</p>
+  </article>
+  <article class="stat-card ghost">
+    <p class="label">Filters</p>
+    <h2>{{ filteredItems().length }}</h2>
+    <p>Visible after search/category filters.</p>
+  </article>
+</section>
+
+<section class="filters">
+  <div class="field">
+    <label>Search</label>
+    <input
+      type="search"
+      placeholder="Search by name, SKU, shelf"
+      [value]="search()"
+      (input)="onSearch($event)"
+    />
+  </div>
+  <div class="field">
+    <label>Category</label>
+    <select [value]="categoryFilter()" (change)="onCategoryChange($event)">
+      <option value="">All</option>
+      <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Subcategory</label>
+    <select
+      [value]="subcategoryFilter()"
+      (change)="onSubcategoryChange($event)"
+    >
+      <option value="">All</option>
+      <ng-container *ngIf="categoryFilter() as cat">
+        <option *ngFor="let sub of subcategoriesByCategory[cat]" [value]="sub">{{ sub }}</option>
+      </ng-container>
+      <ng-container *ngIf="!categoryFilter()">
+        <option
+          *ngFor="let sub of subcategoriesByCategory.Wine.concat(subcategoriesByCategory.Beer, subcategoriesByCategory.Liquor)"
+          [value]="sub"
+        >
+          {{ sub }}
+        </option>
+      </ng-container>
+    </select>
+  </div>
+</section>
+
+<section class="grid">
+  <header class="grid__head">
+    <div>
+      <p class="label">Items</p>
+      <h3>Live inventory snapshot</h3>
+    </div>
+    <div class="badges">
+      <span class="badge" *ngIf="loading()">Loading…</span>
+      <span class="badge warn" *ngIf="error()">{{ error() }}</span>
+      <span class="badge ghost" *ngIf="!loading()">Updated {{ (items().at(0)?.updatedAt || '') | date: 'short' }}</span>
+    </div>
+  </header>
+
+  <div class="table" role="table" aria-label="Inventory">
+    <div class="table__row table__head" role="row">
+      <div role="columnheader">Item</div>
+      <div role="columnheader">SKU</div>
+      <div role="columnheader">Shelf</div>
+      <div role="columnheader">On hand</div>
+      <div role="columnheader">Reorder</div>
+      <div role="columnheader">Category</div>
+      <div role="columnheader">Status</div>
+    </div>
+
+    <div *ngFor="let item of filteredItems(); trackBy: trackById" class="table__row" role="row">
+      <div role="cell">
+        <span class="primary-text">{{ item.name }}</span>
+      </div>
+      <div role="cell">
+        <span class="mono">{{ item.sku }}</span>
+      </div>
+      <div role="cell">{{ item.shelf }}</div>
+      <div role="cell">{{ item.onHand | number }}</div>
+      <div role="cell">{{ item.reorderPoint | number }}</div>
+      <div role="cell">
+        <span class="pill pill--ghost" *ngIf="item.category">{{ item.category }} · {{ item.subcategory }}</span>
+        <span class="pill pill--ghost" *ngIf="!item.category">Unclassified</span>
+      </div>
+      <div role="cell">
+        <span
+          class="pill"
+          [class.pill--ok]="item.onHand > item.reorderPoint"
+          [class.pill--warn]="item.onHand <= item.reorderPoint"
+        >
+          {{ item.onHand > item.reorderPoint ? 'Healthy' : 'Restock soon' }}
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
