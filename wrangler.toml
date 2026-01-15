@@ -6,3 +6,8 @@ assets = { directory = "./dist/inventorytracker-ui", binding = "ASSETS" }
 
 [build]
 command = "npm run build"
+
+
+[vars]
+VITE_SUPABASE_URL = "https://bdqujvxmgruqtbbpxluo.supabase.co"
+VITE_SUPABASE_ANON_KEY = "sb_publishable_AtnJ0-6gV2OZAIfbGppRrw_JM46pKbG"
