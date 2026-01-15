@@ -1,0 +1,8 @@
+name = "inventorytracker-ui"
+main = "src/worker.js"
+compatibility_date = "2026-01-15"
+
+assets = { directory = "./dist/inventorytracker-ui", binding = "ASSETS" }
+
+[build]
+command = "npm run build"
