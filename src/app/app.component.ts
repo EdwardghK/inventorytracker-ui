@@ -1,6 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
+import { filter } from 'rxjs';
 
 @Component({
   selector: 'app-root',
@@ -11,4 +14,19 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 })
 export class AppComponent {
   appName = 'Inventory Tracker';
+
+  constructor(swUpdate: SwUpdate, destroyRef: DestroyRef) {
+    if (!swUpdate.isEnabled) {
+      return;
+    }
+
+    swUpdate.versionUpdates
+      .pipe(
+        filter((event): event is VersionReadyEvent => event.type === 'VERSION_READY'),
+        takeUntilDestroyed(destroyRef),
+      )
+      .subscribe(() => {
+        window.location.reload();
+      });
+  }
 }
