@@ -1,26 +1,26 @@
 <section class="hero">
   <div>
-    <p class="eyebrow">Inventory hub</p>
-    <h1>Track stock, suppliers, and alerts in one view.</h1>
+    <p class="eyebrow">Operations overview</p>
+    <h1>Inventory, vendors, and shelf health in one pulse.</h1>
     <p class="lede">
-      Supabase-backed Angular dashboard for shelves, 3PLs, and store rooms. Swap the mock data with your
-      Supabase tables to go live.
+      A live control room for cellars, bars, and back-of-house storage. Swap mock data with Supabase tables
+      to ship.
     </p>
     <div class="actions">
-      <button type="button" class="primary" (click)="load()" [disabled]="loading()">Refresh data</button>
-      <a class="ghost" href="https://supabase.com" target="_blank" rel="noreferrer">View Supabase docs</a>
+      <button type="button" class="primary" (click)="load()" [disabled]="loading()">Refresh snapshot</button>
+      <a class="ghost" href="https://supabase.com" target="_blank" rel="noreferrer">Supabase playbook</a>
       <button type="button" class="ghost" (click)="toggleScanner()">
         {{ showScanner() ? 'Close scanner' : 'Find items by barcode' }}
       </button>
     </div>
   </div>
   <div class="panel">
-    <p class="label">Status</p>
+    <p class="label">Signal</p>
     <div class="status-row">
       <span class="dot" [class.ok]="!error()" [class.warn]="error()"></span>
       <span>{{ error() ? 'Offline (mock data)' : 'Live Supabase connection' }}</span>
     </div>
-    <p class="hint">Configure `environment.ts` with your Supabase URL and anon key.</p>
+    <p class="hint">Set `environment.ts` with your Supabase URL and anon key.</p>
   </div>
 </section>
 
@@ -97,7 +97,7 @@
       <h3>Live inventory snapshot</h3>
     </div>
     <div class="badges">
-      <span class="badge" *ngIf="loading()">Loading…</span>
+      <span class="badge" *ngIf="loading()">Loading...</span>
       <span class="badge warn" *ngIf="error()">{{ error() }}</span>
       <span class="badge ghost" *ngIf="!loading()">Updated {{ (items().at(0)?.updatedAt || '') | date: 'short' }}</span>
     </div>

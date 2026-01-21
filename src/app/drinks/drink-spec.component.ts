@@ -74,17 +74,7 @@ type IngredientDraft = { amount: string | number; unit: string; name: string };
                     </div>
                   </div>
                 </div>
-                <div class="card__side" *ngIf="isExpanded(drink) || section.title === 'Cocktails'">
-                  <div
-                    class="image-preview"
-                    *ngIf="!isExpanded(drink) && section.title === 'Cocktails'"
-                    [class.has-image]="imageSrc(drink)"
-                    [style.backgroundImage]="imageSrc(drink) ? 'url(' + imageSrc(drink) + ')' : 'none'"
-                    (click)="openImagePreview(drink, $event)"
-                    [class.clickable]="imageSrc(drink)"
-                  >
-                    <span *ngIf="!imageSrc(drink)">No image</span>
-                  </div>
+                <div class="card__side" *ngIf="isExpanded(drink)">
                   <button
                     class="image-placeholder"
                     type="button"

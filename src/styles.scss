@@ -1,8 +1,61 @@
-* {
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-sans: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces', 'Segoe UI', serif;
+  --ink: #f3efe9;
+  --muted: #b7b1a5;
+  --accent: #f4a261;
+  --accent-cool: #2a9d8f;
+  --bg: #0f1210;
+  --panel: #161b18;
+  --panel-strong: #1c241f;
+  --panel-elevated: #202823;
+  --border: #2a332d;
+  --shadow-soft: 0 18px 34px rgba(5, 6, 5, 0.35);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background: #f8fafc;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--bg);
+  background-image: radial-gradient(circle at 15% 10%, rgba(244, 162, 97, 0.2), transparent 45%),
+    radial-gradient(circle at 90% 0%, rgba(42, 157, 143, 0.25), transparent 40%),
+    linear-gradient(145deg, rgba(15, 18, 16, 0.85), rgba(20, 24, 21, 0.95));
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(243, 239, 233, 0.06) 1px, transparent 0);
+  background-size: 22px 22px;
+  opacity: 0.15;
+  z-index: -1;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+a {
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
 }
