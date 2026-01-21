@@ -35,7 +35,7 @@ export class AppComponent {
       });
   }
 
-  signOut() {
-    this.auth.signOut();
+  async signOut() {
+    await this.auth.signOut();
   }
 }

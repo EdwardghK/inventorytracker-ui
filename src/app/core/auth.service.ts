@@ -1,139 +1,238 @@
 import { Injectable, signal } from '@angular/core';
+import { getSupabaseClient } from './supabase.client';
 
 export type UserRole = 'admin' | 'user';
 
 export type AuthUser = {
-  name: string;
-  password: string;
+  id: string;
+  email: string;
+  accountName: string;
   role: UserRole;
   approved: boolean;
 };
 
-type AuthState = {
-  currentUser: AuthUser | null;
-  users: AuthUser[];
-  pending: AuthUser[];
+export type PendingUser = {
+  id: string;
+  accountName: string;
+  role: UserRole;
 };
 
-const STORAGE_KEY = 'inventory-auth-state';
+export type AppUser = {
+  id: string;
+  accountName: string;
+  role: UserRole;
+  approved: boolean;
+};
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private state = signal<AuthState>({
-    currentUser: null,
-    users: [],
-    pending: [],
-  });
-
-  currentUser = this.state.asReadonly();
+  user = signal<AuthUser | null>(null);
+  pending = signal<PendingUser[]>([]);
+  users = signal<AppUser[]>([]);
+  loading = signal(false);
+  private client = getSupabaseClient();
 
   constructor() {
-    this.load();
-    this.ensureAdminSeed();
+    if (!this.client) return;
+    this.refreshSession();
+    this.client.auth.onAuthStateChange(() => {
+      this.refreshSession();
+    });
   }
 
-  get user(): AuthUser | null {
-    return this.state().currentUser;
-  }
-
-  get pending(): AuthUser[] {
-    return this.state().pending;
-  }
-
-  signIn(name: string, password: string): { ok: boolean; error?: string } {
-    const user = this.state().users.find(
-      (item) => item.name.toLowerCase() === name.toLowerCase() && item.password === password,
-    );
-    if (!user) {
-      return { ok: false, error: 'Invalid credentials or account not approved.' };
+  async signIn(accountName: string, password: string): Promise<{ ok: boolean; error?: string }> {
+    if (!this.client) {
+      return { ok: false, error: 'Supabase is not configured.' };
     }
-    this.updateState({ currentUser: user });
+    this.loading.set(true);
+    const { data, error } = await this.client.auth.signInWithPassword({
+      email: accountName.trim(),
+      password,
+    });
+    if (error || !data.user) {
+      this.loading.set(false);
+      return { ok: false, error: error?.message || 'Sign in failed.' };
+    }
+    const profile = await this.fetchProfile(data.user.id);
+    this.loading.set(false);
+    if (!profile) {
+      await this.client.auth.signOut();
+      return { ok: false, error: 'Profile not found. Contact admin.' };
+    }
+    if (!profile.approved) {
+      await this.client.auth.signOut();
+      return { ok: false, error: 'Account pending approval.' };
+    }
     return { ok: true };
   }
 
-  signOut() {
-    this.updateState({ currentUser: null });
-  }
-
-  signUp(request: { name: string; password: string; role: UserRole }): { ok: boolean; error?: string } {
-    const name = request.name.trim();
-    if (!name || !request.password) {
-      return { ok: false, error: 'Name and password are required.' };
+  async signUp(payload: { name: string; password: string; role: UserRole }): Promise<{ ok: boolean; error?: string }> {
+    if (!this.client) {
+      return { ok: false, error: 'Supabase is not configured.' };
     }
-    if (this.findUser(name)) {
-      return { ok: false, error: 'Account already exists.' };
+    const email = payload.name.trim();
+    if (!email || !payload.password) {
+      return { ok: false, error: 'Account name and password are required.' };
     }
-    const pendingUser: AuthUser = {
-      name,
-      password: request.password,
-      role: request.role,
-      approved: false,
-    };
-    const pending = [...this.state().pending, pendingUser];
-    this.updateState({ pending });
+    const { data, error } = await this.client.auth.signUp({
+      email,
+      password: payload.password,
+      options: {
+        data: { account_name: email },
+      },
+    });
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    if (data.session && data.user) {
+      await this.insertProfile(data.user.id, email);
+      await this.client.auth.signOut();
+    }
     return { ok: true };
   }
 
-  approve(name: string) {
-    const pendingUser = this.state().pending.find((item) => item.name.toLowerCase() === name.toLowerCase());
-    if (!pendingUser) return;
-    const approved: AuthUser = { ...pendingUser, approved: true };
-    const users = [...this.state().users, approved];
-    const pending = this.state().pending.filter((item) => item.name.toLowerCase() !== name.toLowerCase());
-    this.updateState({ users, pending });
-  }
-
-  reject(name: string) {
-    const pending = this.state().pending.filter((item) => item.name.toLowerCase() !== name.toLowerCase());
-    this.updateState({ pending });
+  async signOut() {
+    if (!this.client) return;
+    await this.client.auth.signOut();
+    this.user.set(null);
+    this.pending.set([]);
   }
 
   isAdmin(): boolean {
-    return this.state().currentUser?.role === 'admin';
+    return this.user()?.role === 'admin' && this.user()?.approved === true;
   }
 
   isUser(): boolean {
-    return this.state().currentUser?.role === 'user';
+    return this.user()?.role === 'user' && this.user()?.approved === true;
   }
 
-  private findUser(name: string): AuthUser | undefined {
-    return (
-      this.state().users.find((item) => item.name.toLowerCase() === name.toLowerCase()) ||
-      this.state().pending.find((item) => item.name.toLowerCase() === name.toLowerCase())
+  async approve(accountName: string) {
+    if (!this.client) return;
+    if (!this.isAdmin()) return;
+    await this.client.from('app_users').update({ approved: true }).eq('account_name', accountName);
+    await this.refreshPending();
+    await this.refreshUsers();
+  }
+
+  async approveWithRole(accountName: string, role: UserRole) {
+    if (!this.client) return;
+    if (!this.isAdmin()) return;
+    await this.client
+      .from('app_users')
+      .update({ approved: true, role })
+      .eq('account_name', accountName);
+    await this.refreshPending();
+    await this.refreshUsers();
+  }
+
+  async reject(accountName: string) {
+    if (!this.client) return;
+    if (!this.isAdmin()) return;
+    await this.client.from('app_users').delete().eq('account_name', accountName);
+    await this.refreshPending();
+    await this.refreshUsers();
+  }
+
+  async refreshPending() {
+    if (!this.client) return;
+    if (!this.isAdmin()) {
+      this.pending.set([]);
+      return;
+    }
+    const { data, error } = await this.client
+      .from('app_users')
+      .select('id, account_name, role')
+      .eq('approved', false);
+    if (error) {
+      this.pending.set([]);
+      return;
+    }
+    this.pending.set(
+      (data ?? []).map((row) => ({
+        id: row.id,
+        accountName: row.account_name,
+        role: row.role as UserRole,
+      })),
     );
   }
 
-  private ensureAdminSeed() {
-    const existingAdmin = this.state().users.find((item) => item.role === 'admin');
-    if (existingAdmin) return;
-    const seedAdmin: AuthUser = {
-      name: 'admin',
-      password: 'admin123',
-      role: 'admin',
-      approved: true,
-    };
-    const users = [...this.state().users, seedAdmin];
-    this.updateState({ users });
-  }
-
-  private load() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as AuthState;
-      this.state.set({
-        currentUser: parsed.currentUser ?? null,
-        users: parsed.users ?? [],
-        pending: parsed.pending ?? [],
-      });
-    } catch {
-      this.state.set({ currentUser: null, users: [], pending: [] });
+  async refreshUsers() {
+    if (!this.client) return;
+    if (!this.isAdmin()) {
+      this.users.set([]);
+      return;
     }
+    const { data, error } = await this.client
+      .from('app_users')
+      .select('id, account_name, role, approved')
+      .order('account_name');
+    if (error) {
+      this.users.set([]);
+      return;
+    }
+    this.users.set(
+      (data ?? []).map((row) => ({
+        id: row.id,
+        accountName: row.account_name,
+        role: row.role as UserRole,
+        approved: row.approved,
+      })),
+    );
   }
 
-  private updateState(partial: Partial<AuthState>) {
-    const next = { ...this.state(), ...partial };
-    this.state.set(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  async updateRole(accountName: string, role: UserRole) {
+    if (!this.client) return;
+    if (!this.isAdmin()) return;
+    await this.client.from('app_users').update({ role }).eq('account_name', accountName);
+    await this.refreshUsers();
+  }
+
+  private async refreshSession() {
+    if (!this.client) return;
+    const { data } = await this.client.auth.getSession();
+    const session = data.session;
+    if (!session?.user) {
+      this.user.set(null);
+      this.pending.set([]);
+      this.users.set([]);
+      return;
+    }
+    const profile = await this.fetchProfile(session.user.id);
+    if (!profile) {
+      this.user.set(null);
+      return;
+    }
+    this.user.set(profile);
+    await this.refreshPending();
+    await this.refreshUsers();
+  }
+
+  private async fetchProfile(userId: string): Promise<AuthUser | null> {
+    if (!this.client) return null;
+    const { data, error } = await this.client
+      .from('app_users')
+      .select('id, account_name, role, approved')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data) {
+      return null;
+    }
+    return {
+      id: data.id,
+      email: data.account_name,
+      accountName: data.account_name,
+      role: data.role as UserRole,
+      approved: data.approved,
+    };
+  }
+
+  private async insertProfile(userId: string, accountName: string) {
+    if (!this.client) return;
+    await this.client.from('app_users').insert({
+      id: userId,
+      account_name: accountName,
+      role: 'user',
+      approved: false,
+    });
   }
 }

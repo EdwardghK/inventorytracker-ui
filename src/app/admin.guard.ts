@@ -2,11 +2,11 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './core/auth.service';
 
-export const authGuard: CanActivateFn = () => {
+export const adminGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  if (auth.user()) {
+  if (auth.isAdmin()) {
     return true;
   }
-  return router.parseUrl('/signin');
+  return router.parseUrl('/');
 };

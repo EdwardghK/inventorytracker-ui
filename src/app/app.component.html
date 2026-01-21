@@ -5,9 +5,10 @@
       <a routerLink="/inventory" routerLinkActive="active">Inventory</a>
     </nav>
     <div class="nav-actions">
-      <span class="nav-user" *ngIf="auth.user">{{ auth.user.name }}</span>
-      <a class="nav-action" routerLink="/signin" *ngIf="!auth.user">Sign in</a>
-      <button class="nav-action" type="button" *ngIf="auth.user" (click)="signOut()">Sign out</button>
+      <span class="nav-user" *ngIf="auth.user()">{{ auth.user()?.accountName }}</span>
+      <a class="nav-action" routerLink="/signin" *ngIf="!auth.user()">Sign in</a>
+      <a class="nav-action" routerLink="/accounts" *ngIf="auth.isAdmin()">Manage Account</a>
+      <button class="nav-action" type="button" *ngIf="auth.user()" (click)="signOut()">Sign out</button>
     </div>
   </header>
 

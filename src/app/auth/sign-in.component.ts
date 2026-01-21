@@ -22,16 +22,17 @@ import { AuthService } from '../core/auth.service';
             <span>Account name</span>
             <input [(ngModel)]="loginName" placeholder="Account name" />
           </label>
+          <p class="hint">Use your account email.</p>
           <label>
             <span>Password</span>
             <input [(ngModel)]="loginPassword" placeholder="Password" type="password" />
           </label>
           <button class="primary" type="button" (click)="handleSignIn()">Sign in</button>
           <p class="error" *ngIf="loginError()">{{ loginError() }}</p>
-          <p class="muted" *ngIf="auth.user">
-            Signed in as <strong>{{ auth.user.name }}</strong> ({{ auth.user.role }}).
+          <p class="muted" *ngIf="auth.user()">
+            Signed in as <strong>{{ auth.user()?.accountName }}</strong> ({{ auth.user()?.role }}).
           </p>
-          <button class="ghost" type="button" (click)="handleSignOut()" *ngIf="auth.user">Sign out</button>
+          <button class="ghost" type="button" (click)="handleSignOut()" *ngIf="auth.user()">Sign out</button>
           <button class="ghost" type="button" (click)="showCreate.set(true)">Create account</button>
         </div>
 
@@ -41,6 +42,7 @@ import { AuthService } from '../core/auth.service';
             <span>Account name</span>
             <input [(ngModel)]="signupName" placeholder="Account name" />
           </label>
+          <p class="hint">Use an email address for sign-in.</p>
           <label>
             <span>Password</span>
             <input [(ngModel)]="signupPassword" placeholder="Password" type="password" />
@@ -58,12 +60,12 @@ import { AuthService } from '../core/auth.service';
         <p class="muted" *ngIf="pending().length === 0">No pending accounts.</p>
         <div class="approval" *ngFor="let account of pending()">
           <div>
-            <strong>{{ account.name }}</strong>
+            <strong>{{ account.accountName }}</strong>
             <span class="pill">{{ account.role }}</span>
           </div>
           <div class="approval__actions">
-            <button class="primary" type="button" (click)="approve(account.name)">Approve</button>
-            <button class="ghost" type="button" (click)="reject(account.name)">Reject</button>
+            <button class="primary" type="button" (click)="approve(account.accountName)">Approve</button>
+            <button class="ghost" type="button" (click)="reject(account.accountName)">Reject</button>
           </div>
         </div>
       </section>
@@ -81,7 +83,7 @@ export class SignInComponent {
   signupSuccess = signal('');
   showCreate = signal(false);
 
-  pending = computed(() => this.auth.pending);
+  pending = computed(() => this.auth.pending());
 
   constructor(public auth: AuthService, private router: Router) {}
 
@@ -89,9 +91,9 @@ export class SignInComponent {
     return this.auth.isAdmin();
   }
 
-  handleSignIn() {
+  async handleSignIn() {
     this.loginError.set('');
-    const result = this.auth.signIn(this.loginName, this.loginPassword);
+    const result = await this.auth.signIn(this.loginName, this.loginPassword);
     if (!result.ok) {
       this.loginError.set(result.error || 'Sign in failed.');
       return;
@@ -101,14 +103,14 @@ export class SignInComponent {
     this.router.navigateByUrl('/');
   }
 
-  handleSignOut() {
-    this.auth.signOut();
+  async handleSignOut() {
+    await this.auth.signOut();
   }
 
-  handleSignUp() {
+  async handleSignUp() {
     this.signupError.set('');
     this.signupSuccess.set('');
-    const result = this.auth.signUp({
+    const result = await this.auth.signUp({
       name: this.signupName,
       password: this.signupPassword,
       role: 'user',
@@ -120,14 +122,13 @@ export class SignInComponent {
     this.signupSuccess.set('Request submitted. Awaiting approval.');
     this.signupName = '';
     this.signupPassword = '';
-    this.showCreate.set(false);
   }
 
-  approve(name: string) {
-    this.auth.approve(name);
+  async approve(name: string) {
+    await this.auth.approve(name);
   }
 
-  reject(name: string) {
-    this.auth.reject(name);
+  async reject(name: string) {
+    await this.auth.reject(name);
   }
 }
