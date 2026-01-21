@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService, UserRole } from '../core/auth.service';
+import { AuthService } from '../core/auth.service';
 
 @Component({
   selector: 'app-sign-in',
@@ -32,10 +32,11 @@ import { AuthService, UserRole } from '../core/auth.service';
             Signed in as <strong>{{ auth.user.name }}</strong> ({{ auth.user.role }}).
           </p>
           <button class="ghost" type="button" (click)="handleSignOut()" *ngIf="auth.user">Sign out</button>
+          <button class="ghost" type="button" (click)="showCreate.set(true)">Create account</button>
         </div>
 
-        <div class="panel">
-          <h2>Request access</h2>
+        <div class="panel" *ngIf="showCreate()">
+          <h2>Create New Account</h2>
           <label>
             <span>Account name</span>
             <input [(ngModel)]="signupName" placeholder="Account name" />
@@ -44,17 +45,11 @@ import { AuthService, UserRole } from '../core/auth.service';
             <span>Password</span>
             <input [(ngModel)]="signupPassword" placeholder="Password" type="password" />
           </label>
-          <label>
-            <span>Role</span>
-            <select [(ngModel)]="signupRole">
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-            </select>
-          </label>
-          <button class="primary" type="button" (click)="handleSignUp()">Request approval</button>
-          <p class="muted">New accounts require admin approval.</p>
+          <button class="primary" type="button" (click)="handleSignUp()">Create account</button>
+          <p class="muted" *ngIf="!signupSuccess()">New accounts require admin approval.</p>
           <p class="error" *ngIf="signupError()">{{ signupError() }}</p>
           <p class="success" *ngIf="signupSuccess()">{{ signupSuccess() }}</p>
+          <button class="ghost" type="button" (click)="showCreate.set(false)">Close</button>
         </div>
       </div>
 
@@ -81,10 +76,10 @@ export class SignInComponent {
   loginPassword = '';
   signupName = '';
   signupPassword = '';
-  signupRole: UserRole = 'user';
   loginError = signal('');
   signupError = signal('');
   signupSuccess = signal('');
+  showCreate = signal(false);
 
   pending = computed(() => this.auth.pending);
 
@@ -116,7 +111,7 @@ export class SignInComponent {
     const result = this.auth.signUp({
       name: this.signupName,
       password: this.signupPassword,
-      role: this.signupRole,
+      role: 'user',
     });
     if (!result.ok) {
       this.signupError.set(result.error || 'Request failed.');
@@ -125,7 +120,7 @@ export class SignInComponent {
     this.signupSuccess.set('Request submitted. Awaiting approval.');
     this.signupName = '';
     this.signupPassword = '';
-    this.signupRole = 'user';
+    this.showCreate.set(false);
   }
 
   approve(name: string) {
