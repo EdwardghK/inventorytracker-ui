@@ -273,6 +273,64 @@
   gap: 0.75rem;
 }
 
+.edit-form {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.edit-form input,
+.edit-form select {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  background: var(--panel-strong);
+  color: var(--ink);
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.edit-actions button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.6rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.edit-actions .primary {
+  background: var(--accent);
+  color: #1a1310;
+  border: none;
+}
+
+.edit-actions .ghost {
+  background: var(--panel-elevated);
+  color: var(--ink);
+}
+
 .add-card__head {
   display: flex;
   align-items: center;
@@ -518,6 +576,10 @@
 
   .image-placeholder {
     min-height: 150px;
+  }
+
+  .edit-grid {
+    grid-template-columns: 1fr;
   }
 }
 

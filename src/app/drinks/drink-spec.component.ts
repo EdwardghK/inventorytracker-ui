@@ -5,6 +5,15 @@ import { DrinkRecord, DrinkSpecService, DrinkUpsertInput } from './drink-spec.se
 
 type Drink = DrinkRecord;
 type IngredientDraft = { amount: string | number; unit: string; name: string };
+type DrinkEditDraft = {
+  id: string;
+  name: string;
+  type: 'Cocktail' | 'Mocktail';
+  build: string;
+  glass: string;
+  garnish: string;
+  ingredients: IngredientDraft[];
+};
 
 @Component({
   selector: 'app-drink-spec',
@@ -104,9 +113,69 @@ type IngredientDraft = { amount: string | number; unit: string; name: string };
                     >
                       Update image
                     </button>
-                    <button class="ghost" type="button" (click)="startEdit(drink); $event.stopPropagation()">Edit</button>
+                    <button class="ghost" type="button" (click)="startInlineEdit(drink, $event)">Edit</button>
+                    <button class="ghost" type="button" (click)="deleteDrink(drink); $event.stopPropagation()">Delete</button>
                   </div>
+                </div>
               </div>
+              <div class="edit-form" *ngIf="isEditing(drink) && editDraft(drink) as edit" (click)="$event.stopPropagation()">
+                <div class="edit-grid">
+                  <label>
+                    <span>Name</span>
+                    <input [(ngModel)]="edit.name" />
+                  </label>
+                  <label>
+                    <span>Type</span>
+                    <select [(ngModel)]="edit.type">
+                      <option value="Cocktail">Cocktail</option>
+                      <option value="Mocktail">Mocktail</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Build</span>
+                    <input [(ngModel)]="edit.build" />
+                  </label>
+                  <label>
+                    <span>Glass</span>
+                    <input [(ngModel)]="edit.glass" />
+                  </label>
+                  <label>
+                    <span>Garnish</span>
+                    <input [(ngModel)]="edit.garnish" />
+                  </label>
+                  <div class="specs-field">
+                    <span>Ingredients</span>
+                    <div class="ingredients">
+                      <div class="ingredient-row" *ngFor="let ingredient of edit.ingredients; let i = index">
+                        <input
+                          class="ingredient-oz"
+                          type="number"
+                          step="0.25"
+                          min="0"
+                          placeholder="0"
+                          [(ngModel)]="ingredient.amount"
+                        />
+                        <select class="ingredient-unit" [(ngModel)]="ingredient.unit">
+                          <option value="oz">oz</option>
+                          <option value="dash">dash</option>
+                          <option value="dashes">dashes</option>
+                          <option value="splash">splash</option>
+                          <option value="splashes">splashes</option>
+                          <option value="top up">top up</option>
+                        </select>
+                        <input class="ingredient-name" placeholder="Ingredient" [(ngModel)]="ingredient.name" />
+                        <button type="button" class="ghost" (click)="removeInlineIngredient(drink, i, $event)">Remove</button>
+                      </div>
+                      <button type="button" class="ghost add-ingredient" (click)="addInlineIngredient(drink, $event)">
+                        Add ingredient
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="edit-actions">
+                  <button class="primary" type="button" (click)="saveInlineEdit(drink, $event)">Save</button>
+                  <button class="ghost" type="button" (click)="cancelInlineEdit(drink, $event)">Cancel</button>
+                </div>
               </div>
             </article>
           </div>
@@ -200,6 +269,8 @@ export class DrinkSpecComponent {
   availability = signal<Record<string, boolean>>({});
   images = signal<Record<string, string>>({});
   expanded = signal<Record<string, boolean>>({});
+  inlineEditing = signal<Record<string, boolean>>({});
+  inlineDrafts = signal<Record<string, DrinkEditDraft>>({});
   private readonly imageStorageKey = 'drink-spec-images';
 
   drinks = signal<Drink[]>([]);
@@ -351,6 +422,109 @@ export class DrinkSpecComponent {
 
   private key(drink: Drink) {
     return drink.id ?? `${drink.type}-${drink.name}`;
+  }
+
+  startInlineEdit(drink: Drink, event: Event) {
+    event.stopPropagation();
+    if (!drink.id) return;
+    const key = this.key(drink);
+    this.inlineEditing.update((map) => ({ ...map, [key]: true }));
+    this.inlineDrafts.update((map) => ({
+      ...map,
+      [key]: {
+        id: drink.id,
+        name: drink.name,
+        type: drink.type ?? drink.kind ?? 'Cocktail',
+        build: drink.build,
+        glass: drink.glass,
+        garnish: drink.garnish,
+        ingredients: this.parseIngredients(drink.specs),
+      },
+    }));
+    this.expanded.update((map) => ({ ...map, [key]: true }));
+  }
+
+  isEditing(drink: Drink): boolean {
+    return this.inlineEditing()[this.key(drink)] ?? false;
+  }
+
+  editDraft(drink: Drink): DrinkEditDraft | undefined {
+    return this.inlineDrafts()[this.key(drink)];
+  }
+
+  cancelInlineEdit(drink: Drink, event: Event) {
+    event.stopPropagation();
+    const key = this.key(drink);
+    this.inlineEditing.update((map) => {
+      const next = { ...map };
+      delete next[key];
+      return next;
+    });
+    this.inlineDrafts.update((map) => {
+      const next = { ...map };
+      delete next[key];
+      return next;
+    });
+  }
+
+  saveInlineEdit(drink: Drink, event: Event) {
+    event.stopPropagation();
+    const key = this.key(drink);
+    const draft = this.inlineDrafts()[key];
+    if (!draft || !draft.name.trim()) return;
+    const specs = this.buildSpecsFromIngredients(draft.ingredients);
+    const payload: DrinkUpsertInput = {
+      id: draft.id,
+      name: draft.name.trim(),
+      kind: draft.type,
+      build: draft.build.trim(),
+      glass: draft.glass.trim(),
+      garnish: draft.garnish.trim(),
+      specs,
+      available: this.isAvailable(drink),
+    };
+    this.drinkSvc
+      .upsert(payload)
+      .then((saved: Drink) => {
+        this.drinks.update((list) => {
+          const others = list.filter((d) => d.id !== saved.id);
+          return [...others, { ...saved, type: saved.kind }];
+        });
+        this.cancelInlineEdit(drink, event);
+      })
+      .catch((err: unknown) => {
+        console.warn('Inline save failed', err);
+      });
+  }
+
+  addInlineIngredient(drink: Drink, event: Event) {
+    event.stopPropagation();
+    const key = this.key(drink);
+    this.inlineDrafts.update((map) => {
+      const current = map[key];
+      if (!current) return map;
+      const next = {
+        ...current,
+        ingredients: [...current.ingredients, { amount: '', unit: 'oz', name: '' }],
+      };
+      return { ...map, [key]: next };
+    });
+  }
+
+  removeInlineIngredient(drink: Drink, index: number, event: Event) {
+    event.stopPropagation();
+    const key = this.key(drink);
+    this.inlineDrafts.update((map) => {
+      const current = map[key];
+      if (!current) return map;
+      const ingredients = [...current.ingredients];
+      if (ingredients.length === 1) {
+        ingredients[0] = { amount: '', unit: 'oz', name: '' };
+      } else {
+        ingredients.splice(index, 1);
+      }
+      return { ...map, [key]: { ...current, ingredients } };
+    });
   }
 
   addIngredient() {
