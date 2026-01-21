@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DrinkRecord, DrinkSpecService, DrinkUpsertInput } from './drink-spec.service';
+import { AuthService } from '../core/auth.service';
 
 type Drink = DrinkRecord;
 type IngredientDraft = { amount: string | number; unit: string; name: string };
@@ -60,7 +61,11 @@ type DrinkEditDraft = {
                     <span class="pill" [class.unavailable]="!isAvailable(drink)">
                       {{ isAvailable(drink) ? 'Available' : 'Unavailable' }}
                     </span>
-                    <button type="button" (click)="toggleAvailability(drink); $event.stopPropagation()">
+                    <button
+                      type="button"
+                      *ngIf="canEdit()"
+                      (click)="toggleAvailability(drink); $event.stopPropagation()"
+                    >
                       Mark as {{ isAvailable(drink) ? 'Unavailable' : 'Available' }}
                     </button>
                   </div>
@@ -92,15 +97,16 @@ type DrinkEditDraft = {
                     [style.backgroundImage]="imageSrc(drink) ? 'url(' + imageSrc(drink) + ')' : 'none'"
                     (click)="handleImageAction(filePicker, drink, $event)"
                   >
-                    <ng-container *ngIf="!imageSrc(drink)">Add image</ng-container>
                     <ng-container *ngIf="imageSrc(drink)">View image</ng-container>
+                    <ng-container *ngIf="!imageSrc(drink) && canEdit()">Add image</ng-container>
+                    <ng-container *ngIf="!imageSrc(drink) && !canEdit()">No image</ng-container>
                   </button>
                   <input
                     type="file"
                     accept="image/*"
                     class="hidden-input"
                     #filePicker
-                    [disabled]="!isExpanded(drink)"
+                    [disabled]="!isExpanded(drink) || !canEdit()"
                     (click)="$event.stopPropagation()"
                     (change)="onImageSelected($event, drink); $event.stopPropagation()"
                   />
@@ -109,16 +115,29 @@ type DrinkEditDraft = {
                       class="ghost"
                       type="button"
                       (click)="openImagePicker(filePicker, $event)"
-                      *ngIf="imageSrc(drink)"
+                      *ngIf="imageSrc(drink) && canEdit()"
                     >
                       Update image
                     </button>
-                    <button class="ghost" type="button" (click)="startInlineEdit(drink, $event)">Edit</button>
-                    <button class="ghost" type="button" (click)="deleteDrink(drink); $event.stopPropagation()">Delete</button>
+                    <button class="ghost" type="button" *ngIf="canEdit()" (click)="startInlineEdit(drink, $event)">
+                      Edit
+                    </button>
+                    <button
+                      class="ghost"
+                      type="button"
+                      *ngIf="canDelete()"
+                      (click)="deleteDrink(drink); $event.stopPropagation()"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               </div>
-              <div class="edit-form" *ngIf="isEditing(drink) && editDraft(drink) as edit" (click)="$event.stopPropagation()">
+              <div
+                class="edit-form"
+                *ngIf="canEdit() && isEditing(drink) && editDraft(drink) as edit"
+                (click)="$event.stopPropagation()"
+              >
                 <div class="edit-grid">
                   <label>
                     <span>Name</span>
@@ -182,7 +201,7 @@ type DrinkEditDraft = {
         </section>
       </div>
 
-      <details class="add-card" [open]="addOpen()" (toggle)="addOpen.set(addDetails.open)" #addDetails>
+      <details class="add-card" *ngIf="canAdd()" [open]="addOpen()" (toggle)="addOpen.set(addDetails.open)" #addDetails>
         <summary class="add-card__head">
           <h2>Add New Drink</h2>
         </summary>
@@ -321,6 +340,9 @@ export class DrinkSpecComponent {
   }
 
   toggleAvailability(drink: Drink) {
+    if (!this.canEdit()) {
+      return;
+    }
     const next = { ...this.availability() };
     const key = this.key(drink);
     const newVal = !(next[key] ?? true);
@@ -349,6 +371,9 @@ export class DrinkSpecComponent {
   }
 
   saveDraft() {
+    if (!this.canAdd()) {
+      return;
+    }
     if (!this.draft.name.trim()) {
       return;
     }
@@ -391,6 +416,9 @@ export class DrinkSpecComponent {
   }
 
   deleteDrink(drink: Drink) {
+    if (!this.canDelete()) {
+      return;
+    }
     this.drinkSvc
       .delete(drink.id)
       .catch((err: unknown) => console.warn('Delete failed', err))
@@ -426,6 +454,7 @@ export class DrinkSpecComponent {
 
   startInlineEdit(drink: Drink, event: Event) {
     event.stopPropagation();
+    if (!this.canEdit()) return;
     if (!drink.id) return;
     const key = this.key(drink);
     this.inlineEditing.update((map) => ({ ...map, [key]: true }));
@@ -469,6 +498,7 @@ export class DrinkSpecComponent {
 
   saveInlineEdit(drink: Drink, event: Event) {
     event.stopPropagation();
+    if (!this.canEdit()) return;
     const key = this.key(drink);
     const draft = this.inlineDrafts()[key];
     if (!draft || !draft.name.trim()) return;
@@ -499,6 +529,7 @@ export class DrinkSpecComponent {
 
   addInlineIngredient(drink: Drink, event: Event) {
     event.stopPropagation();
+    if (!this.canEdit()) return;
     const key = this.key(drink);
     this.inlineDrafts.update((map) => {
       const current = map[key];
@@ -513,6 +544,7 @@ export class DrinkSpecComponent {
 
   removeInlineIngredient(drink: Drink, index: number, event: Event) {
     event.stopPropagation();
+    if (!this.canEdit()) return;
     const key = this.key(drink);
     this.inlineDrafts.update((map) => {
       const current = map[key];
@@ -528,10 +560,12 @@ export class DrinkSpecComponent {
   }
 
   addIngredient() {
+    if (!this.canAdd()) return;
     this.draft.ingredients.push({ amount: '', unit: 'oz', name: '' });
   }
 
   removeIngredient(index: number) {
+    if (!this.canAdd()) return;
     if (this.draft.ingredients.length === 1) {
       this.draft.ingredients[0] = { amount: '', unit: 'oz', name: '' };
       return;
@@ -573,7 +607,19 @@ export class DrinkSpecComponent {
     return parsed.length ? parsed : [{ amount: '', unit: 'oz', name: '' }];
   }
 
-  constructor(private drinkSvc: DrinkSpecService) {
+  canAdd(): boolean {
+    return this.auth.isAdmin() || this.auth.isUser();
+  }
+
+  canEdit(): boolean {
+    return this.auth.isAdmin() || this.auth.isUser();
+  }
+
+  canDelete(): boolean {
+    return this.auth.isAdmin();
+  }
+
+  constructor(private drinkSvc: DrinkSpecService, private auth: AuthService) {
     this.loadImagesFromStorage();
     this.loadFromDb();
   }
@@ -622,6 +668,10 @@ export class DrinkSpecComponent {
   handleImageAction(picker: HTMLInputElement, drink: Drink, event: Event) {
     if (this.imageSrc(drink)) {
       this.openImagePreview(drink, event);
+      return;
+    }
+    if (!this.canEdit()) {
+      event.stopPropagation();
       return;
     }
     this.openImagePicker(picker, event);
@@ -682,9 +732,3 @@ export class DrinkSpecComponent {
     }
   }
 }
-
-
-
-
-
-

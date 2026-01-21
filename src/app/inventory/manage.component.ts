@@ -3,6 +3,7 @@ import { Component, OnInit, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { InventoryItem, InventorySaveInput, InventoryService } from './inventory.service';
 import { SkuScannerComponent } from './sku-scanner.component';
+import { AuthService } from '../core/auth.service';
 
 @Component({
   selector: 'app-inventory-manage',
@@ -59,7 +60,7 @@ export class InventoryManageComponent implements OnInit {
 
   showScanner = signal(false);
 
-  constructor(private inventory: InventoryService) {}
+  constructor(private inventory: InventoryService, private auth: AuthService) {}
 
   async ngOnInit() {
     await this.load();
@@ -151,6 +152,7 @@ export class InventoryManageComponent implements OnInit {
   }
 
   async deleteItem(id: string) {
+    if (!this.canDelete()) return;
     this.error.set(null);
     try {
       await this.inventory.delete(id);
@@ -163,5 +165,9 @@ export class InventoryManageComponent implements OnInit {
 
   trackById(_: number, item: InventorySaveInput) {
     return item.id;
+  }
+
+  canDelete(): boolean {
+    return this.auth.isAdmin();
   }
 }

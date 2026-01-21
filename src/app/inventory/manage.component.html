@@ -100,7 +100,15 @@
         </div>
         <div class="actions">
           <button class="ghost" type="button" (click)="saveItem(item)" [disabled]="loading()">Save</button>
-          <button class="danger" type="button" (click)="deleteItem(item.id)" [disabled]="loading()">Delete</button>
+          <button
+            class="danger"
+            type="button"
+            *ngIf="canDelete()"
+            (click)="deleteItem(item.id)"
+            [disabled]="loading()"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
