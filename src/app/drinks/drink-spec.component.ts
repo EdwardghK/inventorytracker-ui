@@ -228,7 +228,7 @@ type DrinkEditDraft = {
                   <option value="dashes">dashes</option>
                   <option value="splash">splash</option>
                   <option value="splashes">splashes</option>
-                  <option value="top up">top up</option>
+                  <option value="top up">top up w/</option>
                 </select>
                 <input class="ingredient-name" placeholder="Ingredient" [(ngModel)]="ingredient.name" />
                 <button type="button" class="ghost" (click)="removeIngredient(i)">Remove</button>
